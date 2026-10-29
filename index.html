@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Randy's Field Tech Console</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #06121a;
+        --panel: #0f2230;
+        --text: #d8f4ff;
+        --accent: #37d4ff;
+        --ok: #42d87e;
+      }
+      body {
+        margin: 0;
+        font-family: "Segoe UI", system-ui, sans-serif;
+        background: radial-gradient(circle at top, #0f2f43 0%, var(--bg) 52%);
+        color: var(--text);
+      }
+      main {
+        max-width: 980px;
+        margin: 2rem auto;
+        padding: 0 1rem;
+      }
+      .grid {
+        display: grid;
+        gap: 1rem;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      }
+      section {
+        background: rgba(15, 34, 48, 0.92);
+        border: 1px solid rgba(55, 212, 255, 0.35);
+        border-radius: 12px;
+        padding: 1rem;
+        box-shadow: 0 0 16px rgba(55, 212, 255, 0.2);
+      }
+      h1 {
+        margin: 0 0 1rem;
+        color: var(--accent);
+      }
+      h2 {
+        margin-top: 0;
+        font-size: 1.05rem;
+      }
+      ul {
+        margin: 0;
+        padding-left: 1.2rem;
+      }
+      li {
+        margin-bottom: 0.35rem;
+      }
+      #signal {
+        font-weight: 600;
+        color: var(--ok);
+      }
+      .controls {
+        display: flex;
+        gap: 0.5rem;
+      }
+      button {
+        border: none;
+        border-radius: 8px;
+        padding: 0.55rem 0.8rem;
+        color: #042130;
+        background: var(--accent);
+        cursor: pointer;
+        font-weight: 700;
+      }
+      pre {
+        margin: 0.8rem 0 0;
+        min-height: 4rem;
+        background: rgba(4, 14, 20, 0.9);
+        border-radius: 8px;
+        padding: 0.8rem;
+        white-space: pre-wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Randy's Field Tech Console</h1>
+      <div class="grid">
+        <section>
+          <h2>Active Case Board</h2>
+          <ul>
+            <li>Locate witness phone near old rail yard</li>
+            <li>Cross-check suspicious plate sightings</li>
+            <li>Monitor emergency scanner anomalies</li>
+          </ul>
+        </section>
+        <section>
+          <h2>Signal Monitor</h2>
+          <p id="signal">Secure tunnel online • Latency 24ms</p>
+        </section>
+        <section>
+          <h2>Support Commands</h2>
+          <div class="controls">
+            <button type="button" data-command="drone">Deploy Drone Sweep</button>
+            <button type="button" data-command="trace">Run Vehicle Trace</button>
+            <button type="button" data-command="comms">Boost Team Comms</button>
+          </div>
+          <pre id="log">Awaiting command…</pre>
+        </section>
+      </div>
+    </main>
+    <script>
+      const signal = document.getElementById("signal");
+      const log = document.getElementById("log");
+      const statuses = [
+        "Secure tunnel online • Latency 24ms",
+        "Cell mesh synced • Latency 28ms",
+        "Satellite relay stable • Latency 32ms",
+      ];
+      let idx = 0;
+      setInterval(() => {
+        idx = (idx + 1) % statuses.length;
+        signal.textContent = statuses[idx];
+      }, 2500);
+
+      const responses = {
+        drone: "Drone sweep launched. Heat signatures uploading now.",
+        trace: "Trace complete. Candidate vehicle route mapped in 8 seconds.",
+        comms: "Comms boosted. Team radios moved to encrypted fallback channel.",
+      };
+
+      document.querySelectorAll("button[data-command]").forEach((button) => {
+        button.addEventListener("click", () => {
+          const key = button.getAttribute("data-command");
+          log.textContent = responses[key] || "Command unavailable.";
+        });
+      });
+    </script>
+  </body>
+</html>
