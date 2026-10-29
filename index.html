@@ -4,6 +4,8 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Randy's Field Tech Console</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
       :root {
         color-scheme: dark;
@@ -12,69 +14,109 @@
         --text: #d8f4ff;
         --accent: #37d4ff;
         --ok: #42d87e;
+        --warn: #f0b429;
+        --danger: #ff5c5c;
       }
+      * { box-sizing: border-box; }
       body {
         margin: 0;
         font-family: "Segoe UI", system-ui, sans-serif;
         background: radial-gradient(circle at top, #0f2f43 0%, var(--bg) 52%);
         color: var(--text);
+        min-height: 100vh;
       }
       main {
-        max-width: 980px;
-        margin: 2rem auto;
+        max-width: 1100px;
+        margin: 1.5rem auto;
         padding: 0 1rem;
+      }
+      h1 {
+        margin: 0 0 1rem;
+        color: var(--accent);
+        font-size: 1.8rem;
+        letter-spacing: 0.5px;
       }
       .grid {
         display: grid;
         gap: 1rem;
-        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
       }
       section {
         background: rgba(15, 34, 48, 0.92);
         border: 1px solid rgba(55, 212, 255, 0.35);
         border-radius: 12px;
         padding: 1rem;
-        box-shadow: 0 0 16px rgba(55, 212, 255, 0.2);
-      }
-      h1 {
-        margin: 0 0 1rem;
-        color: var(--accent);
+        box-shadow: 0 0 16px rgba(55, 212, 255, 0.15);
       }
       h2 {
-        margin-top: 0;
+        margin: 0 0 0.75rem;
         font-size: 1.05rem;
+        color: var(--accent);
       }
-      ul {
-        margin: 0;
-        padding-left: 1.2rem;
-      }
+      ul { margin: 0; padding-left: 1.1rem; list-style: none; }
       li {
-        margin-bottom: 0.35rem;
-      }
-      #signal {
-        font-weight: 600;
-        color: var(--ok);
-      }
-      .controls {
+        margin-bottom: 0.5rem;
         display: flex;
+        align-items: flex-start;
         gap: 0.5rem;
+        font-size: 0.95rem;
+      }
+      .case-done { text-decoration: line-through; opacity: 0.6; }
+      .case-priority-high { color: var(--danger); }
+      .case-priority-med { color: var(--warn); }
+      button, input, select, textarea {
+        font: inherit;
+        border-radius: 8px;
       }
       button {
         border: none;
-        border-radius: 8px;
-        padding: 0.55rem 0.8rem;
+        padding: 0.5rem 0.75rem;
         color: #042130;
         background: var(--accent);
         cursor: pointer;
         font-weight: 700;
       }
-      pre {
-        margin: 0.8rem 0 0;
-        min-height: 4rem;
+      button.secondary { background: #1a3a4d; color: var(--text); }
+      button.danger { background: var(--danger); color: #fff; }
+      button:disabled { opacity: 0.5; cursor: not-allowed; }
+      input, select, textarea {
+        width: 100%;
+        padding: 0.45rem 0.6rem;
+        background: rgba(4, 14, 20, 0.9);
+        border: 1px solid rgba(55, 212, 255, 0.3);
+        color: var(--text);
+        margin-bottom: 0.5rem;
+      }
+      textarea { min-height: 60px; resize: vertical; }
+      #signal { font-weight: 600; color: var(--ok); }
+      #map { height: 220px; border-radius: 8px; margin-top: 0.5rem; }
+      pre, .log {
+        margin: 0.6rem 0 0;
+        min-height: 5rem;
+        max-height: 180px;
+        overflow-y: auto;
         background: rgba(4, 14, 20, 0.9);
         border-radius: 8px;
-        padding: 0.8rem;
+        padding: 0.7rem;
         white-space: pre-wrap;
+        font-size: 0.85rem;
+        line-height: 1.4;
+      }
+      .controls { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.5rem; }
+      .add-case { margin-top: 0.75rem; }
+      .status-dot {
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        margin-right: 6px;
+        background: var(--ok);
+      }
+      .footer {
+        text-align: center;
+        opacity: 0.6;
+        font-size: 0.8rem;
+        margin-top: 1.5rem;
       }
     </style>
   </head>
@@ -84,53 +126,204 @@
       <div class="grid">
         <section>
           <h2>Active Case Board</h2>
-          <ul>
-            <li>Locate witness phone near old rail yard</li>
-            <li>Cross-check suspicious plate sightings</li>
-            <li>Monitor emergency scanner anomalies</li>
-          </ul>
+          <ul id="case-list"></ul>
+          <div class="add-case">
+            <input id="new-case" type="text" placeholder="New case description…" />
+            <select id="priority">
+              <option value="normal">Normal</option>
+              <option value="med">Medium</option>
+              <option value="high">High</option>
+            </select>
+            <button id="add-case-btn">Add Case</button>
+          </div>
         </section>
+
         <section>
-          <h2>Signal Monitor</h2>
-          <p id="signal">Secure tunnel online • Latency 24ms</p>
+          <h2>Signal & Position</h2>
+          <p id="signal"><span class="status-dot"></span>Secure tunnel online • Latency 24ms</p>
+          <p id="geo">Location: acquiring…</p>
+          <div id="map"></div>
         </section>
+
         <section>
           <h2>Support Commands</h2>
           <div class="controls">
-            <button type="button" data-command="drone">Deploy Drone Sweep</button>
-            <button type="button" data-command="trace">Run Vehicle Trace</button>
-            <button type="button" data-command="comms">Boost Team Comms</button>
+            <button data-command="drone">Deploy Drone Sweep</button>
+            <button data-command="trace">Run Vehicle Trace</button>
+            <button data-command="comms">Boost Team Comms</button>
+            <button data-command="scan" class="secondary">Local Scan</button>
+            <button id="clear-log" class="secondary">Clear Log</button>
           </div>
-          <pre id="log">Awaiting command…</pre>
+          <div class="log" id="log">Awaiting command…</div>
         </section>
       </div>
+      <p class="footer">Field console • data stored locally in this browser</p>
     </main>
+
     <script>
-      const signal = document.getElementById("signal");
-      const log = document.getElementById("log");
+      const caseList = document.getElementById("case-list");
+      const newCaseInput = document.getElementById("new-case");
+      const prioritySelect = document.getElementById("priority");
+      const addBtn = document.getElementById("add-case-btn");
+      const signalEl = document.getElementById("signal");
+      const geoEl = document.getElementById("geo");
+      const logEl = document.getElementById("log");
+      const clearLogBtn = document.getElementById("clear-log");
+
+      let cases = JSON.parse(localStorage.getItem("field-cases") || "null") || [
+        { id: 1, text: "Locate witness phone near old rail yard", priority: "high", done: false },
+        { id: 2, text: "Cross-check suspicious plate sightings", priority: "med", done: false },
+        { id: 3, text: "Monitor emergency scanner anomalies", priority: "normal", done: false }
+      ];
+      let nextId = cases.reduce((m, c) => Math.max(m, c.id), 0) + 1;
+      let logLines = JSON.parse(localStorage.getItem("field-log") || "[]");
+
+      function save() {
+        localStorage.setItem("field-cases", JSON.stringify(cases));
+        localStorage.setItem("field-log", JSON.stringify(logLines.slice(-50)));
+      }
+
+      function renderCases() {
+        caseList.innerHTML = "";
+        if (!cases.length) {
+          caseList.innerHTML = "<li style='opacity:.6'>No active cases</li>";
+          return;
+        }
+        cases.forEach(c => {
+          const li = document.createElement("li");
+          if (c.done) li.classList.add("case-done");
+          if (c.priority === "high") li.classList.add("case-priority-high");
+          if (c.priority === "med") li.classList.add("case-priority-med");
+          li.innerHTML = `
+            <input type="checkbox" ${c.done ? "checked" : ""} data-id="${c.id}" />
+            <span>${c.text}</span>
+            <button class="danger" style="margin-left:auto;padding:0.2rem 0.45rem;font-size:0.75rem" data-del="${c.id}">×</button>
+          `;
+          caseList.appendChild(li);
+        });
+      }
+
+      function appendLog(msg) {
+        const ts = new Date().toLocaleTimeString();
+        logLines.push(`[${ts}] ${msg}`);
+        if (logLines.length > 50) logLines.shift();
+        logEl.textContent = logLines.slice().reverse().join("\n");
+        save();
+      }
+
+      // Signal cycling
       const statuses = [
         "Secure tunnel online • Latency 24ms",
         "Cell mesh synced • Latency 28ms",
         "Satellite relay stable • Latency 32ms",
+        "Mesh hop confirmed • Latency 21ms",
+        "Encrypted fallback ready • Latency 36ms"
       ];
-      let idx = 0;
+      let sidx = 0;
       setInterval(() => {
-        idx = (idx + 1) % statuses.length;
-        signal.textContent = statuses[idx];
-      }, 2500);
+        sidx = (sidx + 1) % statuses.length;
+        signalEl.innerHTML = `<span class="status-dot"></span>${statuses[sidx]}`;
+      }, 2200);
 
+      // Geolocation + map
+      let map, marker;
+      function initMap(lat = 36.17, lng = -115.14) { // default Vegas-ish
+        if (map) return;
+        map = L.map("map").setView([lat, lng], 13);
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+          attribution: "&copy; OpenStreetMap"
+        }).addTo(map);
+        marker = L.marker([lat, lng]).addTo(map);
+      }
+
+      if (navigator.geolocation) {
+        navigator.geolocation.watchPosition(
+          pos => {
+            const { latitude: lat, longitude: lng, accuracy } = pos.coords;
+            geoEl.textContent = `Position: ${lat.toFixed(5)}, ${lng.toFixed(5)} ±${Math.round(accuracy)}m`;
+            initMap(lat, lng);
+            marker.setLatLng([lat, lng]);
+            map.setView([lat, lng], 15);
+          },
+          () => {
+            geoEl.textContent = "Location unavailable (permission denied or unsupported)";
+            initMap();
+          },
+          { enableHighAccuracy: true, maximumAge: 10000 }
+        );
+      } else {
+        geoEl.textContent = "Geolocation not supported";
+        initMap();
+      }
+
+      // Commands
       const responses = {
-        drone: "Drone sweep launched. Heat signatures uploading now.",
-        trace: "Trace complete. Candidate vehicle route mapped in 8 seconds.",
-        comms: "Comms boosted. Team radios moved to encrypted fallback channel.",
+        drone: () => "Drone sweep launched. Thermal + optical feeds streaming. 3 heat signatures flagged in sector 4.",
+        trace: () => "Vehicle trace complete. Last known plate match on I-15 southbound 14 min ago. Route overlay ready.",
+        comms: () => "Team radios boosted and rekeyed. Encrypted fallback channel active. All units confirmed.",
+        scan: () => "Local RF scan finished. 2 unknown bursts on 446 MHz, one cellular anomaly near rail yard."
       };
 
-      document.querySelectorAll("button[data-command]").forEach((button) => {
-        button.addEventListener("click", () => {
-          const key = button.getAttribute("data-command");
-          log.textContent = responses[key] || "Command unavailable.";
+      document.querySelectorAll("button[data-command]").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const key = btn.dataset.command;
+          const fn = responses[key];
+          const msg = fn ? fn() : "Command unavailable.";
+          appendLog(msg);
         });
       });
+
+      clearLogBtn.addEventListener("click", () => {
+        logLines = [];
+        logEl.textContent = "Log cleared.";
+        save();
+      });
+
+      // Case actions
+      addBtn.addEventListener("click", () => {
+        const text = newCaseInput.value.trim();
+        if (!text) return;
+        cases.push({ id: nextId++, text, priority: prioritySelect.value, done: false });
+        newCaseInput.value = "";
+        renderCases();
+        appendLog(`Case added: ${text}`);
+        save();
+      });
+
+      newCaseInput.addEventListener("keydown", e => {
+        if (e.key === "Enter") addBtn.click();
+      });
+
+      caseList.addEventListener("change", e => {
+        if (e.target.type === "checkbox") {
+          const id = +e.target.dataset.id;
+          const c = cases.find(x => x.id === id);
+          if (c) {
+            c.done = e.target.checked;
+            renderCases();
+            appendLog(`${c.done ? "Closed" : "Reopened"}: ${c.text}`);
+            save();
+          }
+        }
+      });
+
+      caseList.addEventListener("click", e => {
+        if (e.target.dataset.del) {
+          const id = +e.target.dataset.del;
+          const c = cases.find(x => x.id === id);
+          cases = cases.filter(x => x.id !== id);
+          renderCases();
+          if (c) appendLog(`Case removed: ${c.text}`);
+          save();
+        }
+      });
+
+      // Init
+      renderCases();
+      if (logLines.length) {
+        logEl.textContent = logLines.slice().reverse().join("\n");
+      }
+      appendLog("Console online. Local data restored.");
     </script>
   </body>
 </html>
